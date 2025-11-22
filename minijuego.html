@@ -1,479 +1,653 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Juego 2 Jugadores - Preguntas Humanidades</title>
-<script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js"></script>
-
-
+<title>Juegos Educativos — Ahorcado • Crucigrama • Dado</title>
 <style>
-  body{margin:0;background:linear-gradient(#111827,#071029);font-family:Inter,system-ui,Arial;color:#e6eef8}
-  #gameContainer{display:flex;justify-content:center;padding:18px}
-  canvas{border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,0.6)}
-  /* HUD superior */
-  .hud{
-    position: absolute;
-    left:50%;
-    transform: translateX(-50%);
-    top:8px;
+  :root{
+    --bg:#f3f8ff;
+    --card:#ffffff;
+    --accent:#3fbf9b;
+    --accent-dark:#2fa282;
+    --muted:#6b7280;
+    --success:#16a34a;
+    --danger:#ef4444;
+    --glass: rgba(255,255,255,0.7);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    background:linear-gradient(135deg,var(--bg),#e9f6f3 60%);
+    color:#0f172a;
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+    padding:20px;
+  }
+
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;max-width:1100px;margin:0 auto 20px}
+  header h1{font-size:1.3rem;margin:0;color:var(--accent-dark)}
+  header p{margin:0;color:var(--muted);font-size:0.95rem}
+
+  .layout{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:320px 1fr;gap:20px}
+  @media (max-width:880px){.layout{grid-template-columns:1fr}}
+
+  /* Sidebar menu */
+  .menu{
+    background:var(--card);
+    border-radius:12px;
+    padding:16px;
+    box-shadow:0 6px 18px rgba(15,23,42,0.08);
+  }
+  .menu h2{margin:0 0 12px 0;color:var(--accent)}
+  .menu button{
+    width:100%;
     display:flex;
-    gap:12px;
-    z-index:20;
+    gap:10px;
+    align-items:center;
+    padding:12px 14px;
+    background:linear-gradient(180deg,var(--glass),#fff);
+    border:1px solid rgba(15,23,42,0.06);
+    border-radius:10px;
+    cursor:pointer;
+    margin-bottom:10px;
+    font-weight:600;
+    color:#083344;
+    transition:transform .15s ease,box-shadow .15s ease;
+  }
+  .menu button:hover{transform:translateY(-3px);box-shadow:0 8px 20px rgba(11,22,33,0.06)}
+  .menu button.active{background:linear-gradient(180deg,var(--accent),var(--accent-dark));color:#fff;box-shadow:0 8px 20px rgba(63,191,155,0.18)}
+
+  /* Content cards */
+  .card{
+    background:var(--card);
+    border-radius:12px;
+    padding:18px;
+    box-shadow:0 6px 18px rgba(15,23,42,0.06);
+    margin-bottom:18px;
+  }
+
+  .game-header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+  /* Ahorcado layout */
+  #ahorcadoCanvas{background:linear-gradient(180deg,#fff,#fbfffb);border-radius:10px;border:1px solid rgba(15,23,42,0.04)}
+  .hidden{display:none}
+
+  .word{
+    font-size:1.6rem;
+    letter-spacing:10px;
     font-weight:700;
+    text-align:center;
+    margin:14px 0;
   }
-  .pill{background:rgba(255,255,255,0.04);padding:8px 12px;border-radius:999px;border:1px solid rgba(255,255,255,0.03)}
-  /* Modal preguntas */
-  #questionModal{
-    position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(720px,92vw);z-index:50;
-    background:linear-gradient(180deg, rgba(8,10,20,0.98), rgba(6,8,18,0.98));box-shadow:0 12px 40px rgba(0,0,0,0.7);
-    border-radius:12px;padding:18px;display:none;color:#e6eef8;border:1px solid rgba(255,255,255,0.04)
+
+  .keyboard{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+  .key{
+    width:36px;height:36px;border-radius:8px;border:1px solid rgba(15,23,42,0.06);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;background:#fff;font-weight:700;color:#07323a;
+    transition:transform .08s ease;
   }
-  #questionModal h3{margin:0 0 8px 0;font-size:18px}
-  #questionModal p{margin:0 0 14px 0;color:#bcd3ff}
-  .options{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .optBtn{
-    background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-    padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);cursor:pointer;font-weight:800;
+  .key:hover{transform:translateY(-3px)}
+  .key.disabled{opacity:.35;cursor:not-allowed;transform:none}
+
+  .status{display:flex;justify-content:space-between;align-items:center;margin-top:12px;color:var(--muted)}
+  .status strong{color:#0b2b2e}
+
+  /* Crucigrama */
+  .crossword-grid{display:grid;gap:2px;justify-content:center;margin:14px 0}
+  .cw-cell{width:40px;height:40px;background:#f7fafb;border-radius:6px;display:flex;align-items:center;justify-content:center;position:relative;border:1px solid rgba(2,6,23,0.05)}
+  .cw-cell input{width:100%;height:100%;border:none;text-align:center;font-weight:700;font-size:16px;background:transparent;outline:none}
+  .cw-cell.black{background:#0f172a;border-radius:6px}
+  .clues{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+  .clue{background:linear-gradient(180deg,#fff,#fbfffb);padding:10px;border-radius:8px;border:1px solid rgba(15,23,42,0.04)}
+  .clue h4{margin:0 0 6px 0;font-size:0.95rem;color:var(--accent-dark)}
+
+  /* Dado */
+  .dice-area{display:flex;flex-direction:column;align-items:center;gap:12px}
+  .dice{
+    width:110px;height:110px;border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:40px;font-weight:900;color:var(--accent-dark);
+    box-shadow:0 8px 20px rgba(11,22,33,0.06);
+    transition:transform .6s cubic-bezier(.2,.8,.2,1);
   }
-  .optBtn:hover{transform:translateY(-3px)}
-  #closeInfo{position:fixed;right:14px;top:14px;color:#bcd3ff;font-size:13px;z-index:30}
-  .small{font-size:13px;color:#cfd4dd}
-  footer{position:fixed;left:50%;transform:translateX(-50%);bottom:12px;color:#9fb4d8;font-size:13px}
+  .dice.spin{transform:rotate(720deg) scale(1.05)}
+
+  /* Footer */
+  footer{text-align:center;color:var(--muted);margin-top:18px;font-size:0.9rem}
+  .muted{color:var(--muted)}
+
+  /* small screens */
+  @media (max-width:520px){
+    .cw-cell{width:34px;height:34px}
+    .word{font-size:1.3rem;letter-spacing:6px}
+  }
 </style>
 </head>
-
 <body>
-  <div id="closeInfo" class="small">Jugador1: Flechas; Jugador2: W/A/D (W saltar)</div>
-  <div class="hud" aria-hidden="false">
-    <div class="pill">Jugador 1: <span id="score1">0</span> pts</div>
-    <div class="pill">Jugador 2: <span id="score2">0</span> pts</div>
-    <div class="pill" id="chestsLeft">Cofres: 0</div>
+
+<header>
+  <div>
+    <h1>Juegos Educativos</h1>
+    <p class="muted">Ahorcado animado • Crucigrama dinámico • Dado con preguntas y sonido</p>
   </div>
-
-  <div id="gameContainer"></div>
-
-  <!-- Modal de pregunta -->
-  <div id="questionModal" role="dialog" aria-modal="true" aria-label="Pregunta de Humanidades">
-    <h3 id="qm_player">Jugador</h3>
-    <p id="qm_question">¿Pregunta?</p>
-    <div class="options" id="qm_options">
-      <!-- botones A-D -->
-    </div>
-    <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
-      <div class="small">Respuesta correcta: <span id="qm_feedback" style="font-weight:800"></span></div>
-      <button id="qm_close" style="background:#c0c5cc;border:none;padding:8px 12px;border-radius:8px;color:white;cursor:pointer">Continuar</button>
-    </div>
-    
+  <div>
+    <p class="muted">Estilo: educativo, sonidos integrados, todo en una página</p>
   </div>
+</header>
 
-  <footer>Bonificación: +10 pts correcto — -5 pts incorrecto. Preguntas: Humanidades / Español — múltiples opciones.</footer>
+<div class="layout">
 
-<script>
-// -----------------------------
-// Preguntas (editable fácilmente)
-// cada pregunta: {q, options:[...], answer: index (0..3), topic }
-// -----------------------------
-const QUESTIONS = [
-  {
-    q: "¿Cuál es la función principal de un texto argumentativo?",
-    options: [
-      "Informar hechos sin opinión",
-      "Persuadir o convencer al lector",
-      "Relatar eventos cronológicos",
-      "Describir detalles sensoriales"
-    ],
-    answer: 1,
-    topic: "Humanidades - Lenguaje"
-  },
-  {
-    q: "¿Cuál de las siguientes es una figura retórica que consiste en usar exageración?",
-    options: ["Metáfora","Hipérbole","Metonimia","Eufemismo"],
-    answer: 1,
-    topic: "Humanidades - Literatura"
-  },
-  {
-    q: "¿Cuál es la función de la tilde en una palabra aguda terminada en 'n'?",
-    options: [
-      "Se usa siempre",
-      "No se usa cuando la palabra acaba en 'n'",
-      "Se usa si la palabra no termina en vocal",
-      "No corresponde: las agudas en 'n' llevan tilde si tienen acento prosódico"
-    ],
-    answer: 3,
-    topic: "Español - Ortografía"
-  },
-  {
-    q: "Selecciona la oración con complemento directo:",
-    options: [
-      "María corre rápido.",
-      "Pedro come una manzana.",
-      "El sol brilla intensamente.",
-      "Llegaron temprano al cine."
-    ],
-    answer: 1,
-    topic: "Español - Gramática"
-  },
-  {
-    q: "¿Qué elemento caracteriza al cuento como género literario?",
-    options: [
-      "Extensión muy larga y muchos personajes",
-      "Prosa breve y unidad de efecto",
-      "Uso exclusivo de verso",
-      "Ausencia de conflicto"
-    ],
-    answer: 1,
-    topic: "Humanidades - Literatura"
-  }
-];
+  <!-- Sidebar -->
+  <aside class="menu card" aria-label="Menú de juegos">
+    <h2>Selecciona un juego</h2>
+    <button id="btn-ahorcado" class="active" onclick="showGame('ahorcado')">🪢 Ahorcado</button>
+    <button id="btn-crucigrama" onclick="showGame('crucigrama')">🧩 Crucigrama</button>
+    <button id="btn-dado" onclick="showGame('dado')">🎲 Dado</button>
+    <button id="btn-genially" onclick="window.location.href='genially.html'">🧩 Genially</button>
+    <button id="btn-milaulas" onclick="window.open('https://legrama.milaulas.com/', '_blank')">⭐ Mil Aulas
+</button>
 
-// -----------------------------
-// Configuración Phaser
-// -----------------------------
-const config = {
-  type: Phaser.AUTO,
-  width: 960,
-  height: 540,
-  parent: 'gameContainer',
-  backgroundColor: '#79a7ff',
-  physics: {
-    default: 'arcade',
-    arcade: { gravity: { y: 1000 }, debug: false }
-  },
-  scene: {
-    preload: preload,
-    create: create,
-    update: update
-  }
-};
 
-const game = new Phaser.Game(config);
 
-// Variables del juego globales
-let player1, player2;
-let cursors;
-let keysWASD;
-let platforms;
-let chestsGroup;
-let score1 = 0, score2 = 0;
-let chestsTotal = 0;
-let chestQuestionMap = {}; // chest.id -> question index
-let modal = document.getElementById('questionModal');
-let qm_player = document.getElementById('qm_player');
-let qm_question = document.getElementById('qm_question');
-let qm_options = document.getElementById('qm_options');
-let qm_feedback = document.getElementById('qm_feedback');
-let qm_close = document.getElementById('qm_close');
 
-function preload() {
-  // No assets externos. Creamos texturas básicas con gráficos.
-  this.load.image('ground', createBase64Rect(200, 32, '#6b4f2a'));
-  this.load.image('platform', createBase64Rect(120, 24, '#8b5e3c'));
-  this.load.image('chest', createChestSprite());
-  // crear sprites de jugador (dos colores)
-  this.load.image('player1', createBase64Rect(36, 48, '#ffd166'));
-  this.load.image('player2', createBase64Rect(36, 48, '#6ef0b7'));
-  // simple coin icon if needed
-  this.load.image('coin', createBase64Rect(18,18,'#ffd700'));
+    <div style="margin-top:14px">
+      <p style="margin:0 0 6px 0;color:var(--muted)"><strong>Consejos:</strong></p>
+      <ul style="margin:0;padding-left:18px;color:var(--muted)">
+        <li>Usa el teclado en Ahorcado o haz click en las teclas.</li>
+        <li>En Crucigrama escribe letras y presiona "Comprobar".</li>
+        <li>En Dado pulsa "Tirar dado" y responde la pregunta.</li>
+        <li>Genially.</li>
+        <li>Mil Aulas.</li>
 
-  // small sound (optional)
-  // no sound files to keep local
-}
+      </ul>
+    </div>
+  </aside>
 
-function create() {
-  const scene = this;
+  <!-- Main content -->
+  <main>
 
-  // Fondo simple (cielo + montañas)
-  const graphics = this.add.graphics();
-  graphics.fillStyle(0x87ceeb, 1);
-  graphics.fillRect(0, 0, config.width, config.height);
-  // simple ground gradient drawn as tiles later
+    <!-- Ahorcado -->
+    <section id="ahorcado" class="card">
+      <div class="game-header">
+        <div>
+          <h3 style="margin:0;color:var(--accent-dark)">Ahorcado — Recursos Educativos</h3>
+          <p class="muted" style="margin:6px 0 0">Adivina la palabra. Fallos permitidos: 6</p>
+        </div>
+        <div class="controls">
+          <button onclick="startAhorcado()">🔁 Nuevo</button>
+          <button onclick="hintLetter()">💡 Pista (-1 intento)</button>
+        </div>
+      </div>
 
-  // Platforms static group
-  platforms = this.physics.add.staticGroup();
-  // ground
-  platforms.create(480, 520, 'ground').setScale(5,1).refreshBody();
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;align-items:center">
+        <canvas id="ahorcadoCanvas" width="300" height="320" style="flex:0 0 300px"></canvas>
+        <div style="flex:1;min-width:220px">
+          <div id="palabraArea" class="word">_ _ _ _ _</div>
+          <div style="text-align:center;margin-top:8px">
+            <div class="keyboard" id="keyboard"></div>
+          </div>
+          <div class="status">
+            <div>Intentos: <strong id="intentos">6</strong></div>
+            <div id="msgAhorcado" style="color:var(--muted)"></div>
+          </div>
+        </div>
+      </div>
+    </section>
 
-  // some platforms
-  platforms.create(200, 420, 'platform');
-  platforms.create(760, 360, 'platform');
-  platforms.create(480, 300, 'platform');
-  platforms.create(110, 250, 'platform');
-  platforms.create(860, 220, 'platform');
+    <!-- Crucigrama -->
+    <section id="crucigrama" class="card hidden">
+      <div class="game-header">
+        <div>
+          <h3 style="margin:0;color:var(--accent-dark)">Crucigrama — Recursos Educativos</h3>
+          <p class="muted" style="margin:6px 0 0">Completa las palabras en la cuadrícula y comprueba tu solución.</p>
+        </div>
+        <div class="controls">
+          <button onclick="resetCrossword()">🔁 Reiniciar</button>
+          <button onclick="checkCrossword()">✅ Comprobar</button>
+        </div>
+      </div>
 
-  // players
-  player1 = this.physics.add.sprite(120, 460, 'player1').setScale(1).setBounce(0.05).setCollideWorldBounds(true);
-  player2 = this.physics.add.sprite(200, 460, 'player2').setScale(1).setBounce(0.05).setCollideWorldBounds(true);
+      <div style="display:flex;flex-direction:column;align-items:center;margin-top:16px">
+        <div id="cwGrid" class="crossword-grid"></div>
 
-  // sizes / body
-  player1.body.setSize(36,48);
-  player2.body.setSize(36,48);
+        <div class="clues" style="width:100%;max-width:720px">
+          <div class="clue">
+            <h4>Horizontales</h4>
+            <p>1. Recurso impreso para estudiar. (5 letras)</p>
+            <p>2. Medio audiovisual. (5 letras)</p>
+            <p>3. Plataforma virtual (9 letras)</p>
+          </div>
+          <div class="clue">
+            <h4>Verticales</h4>
+            <p>1. Persona que enseña. (6 letras)</p>
+            <p>2. Persona que aprende. (9 letras)</p>
+            <p>3. Tecnología para educar. (10 letras)</p>
+          </div>
+        </div>
 
-  // collisions player <-> platforms
-  this.physics.add.collider(player1, platforms);
-  this.physics.add.collider(player2, platforms);
+        <p style="margin-top:12px;color:var(--muted)">Escribe letras, usa mayúsculas o minúsculas — el sistema lo normaliza.</p>
+      </div>
+    </section>
 
-  // cursors & WASD
-  cursors = this.input.keyboard.createCursorKeys();
-  keysWASD = this.input.keyboard.addKeys({ up: Phaser.Input.Keyboard.KeyCodes.W, left: Phaser.Input.Keyboard.KeyCodes.A, right: Phaser.Input.Keyboard.KeyCodes.D });
+    <!-- Dado -->
+    <section id="dado" class="card hidden">
+      <div class="game-header">
+        <div>
+          <h3 style="margin:0;color:var(--accent-dark)">Dado de Preguntas</h3>
+          <p class="muted" style="margin:6px 0 0">Tira el dado y responde la pregunta relacionada.</p>
+        </div>
+        <div class="controls">
+          <button onclick="playDice()">🎲 Tirar dado</button>
+          <button onclick="playSound('click')">🔊 Test sonido</button>
+        </div>
+      </div>
 
-  // chests group
-  chestsGroup = this.physics.add.staticGroup();
-  // colocamos cofres en varias posiciones y asignamos preguntas
-  const chestPositions = [
-    {x: 400, y: 460},
-    {x: 760, y: 320},
-    {x: 480, y: 260},
-    {x: 110, y: 210},
-    {x: 860, y: 180}
-  ];
+      <div class="dice-area" style="margin-top:16px">
+        <div id="diceBox" class="dice">1</div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center">
+          <div style="min-width:280px;text-align:left">
+            <p style="margin:6px 0;color:var(--muted)"><strong>Pregunta:</strong></p>
+            <p id="diceQuestion" style="min-height:36px;font-weight:700"></p>
+            <p style="margin:8px 0 0;color:var(--muted)">Respuesta esperada (clic en mostrar para ver):</p>
+            <p id="diceAnswer" style="font-weight:700;color:var(--accent-dark)"></p>
+          </div>
+        </div>
+      </div>
+    </section>
 
-  // si hay más cofres que preguntas, se repetirán aleatoriamente
-  chestsTotal = chestPositions.length;
-  chestPositions.forEach((pos, idx) => {
-    const ch = chestsGroup.create(pos.x, pos.y, 'chest').setScale(0.85).refreshBody();
-    // asignar un id y una pregunta al cofre
-    const qIndex = Phaser.Math.Between(0, QUESTIONS.length - 1);
-    chestQuestionMap[ch.body.gameObject.name || ch.body.gameObject.texture.key + '_' + idx] = qIndex;
-    // store mapping on sprite too
-    ch.questionIndex = qIndex;
-    ch.collected = false;
-  });
-
-  // overlap players with chests -> abrir pregunta
-  this.physics.add.overlap(player1, chestsGroup, (p, chest) => onChestTouched(scene, chest, 1), null, this);
-  this.physics.add.overlap(player2, chestsGroup, (p, chest) => onChestTouched(scene, chest, 2), null, this);
-
-  // world bounds
-  this.physics.world.setBounds(0, 0, config.width, config.height);
-
-  // camera follow middle point between players
-  this.cameras.main.setBounds(0, 0, config.width, config.height);
-
-  // Input pointer: allow clicking option with mouse
-  qm_close.addEventListener('click', () => { hideModal(); });
-
-  updateScoresHUD();
-}
-
-// simple helper to generate a base64 rectangle as a texture key
-function createBase64Rect(w, h, color){
-  // create canvas
-  const c = document.createElement('canvas'); c.width = w; c.height = h;
-  const ctx = c.getContext('2d');
-  ctx.fillStyle = color;
-  // rounded rect
-  roundRectCtx(ctx, 0, 0, w, h, 8);
-  ctx.fill();
-  // stroke
-  ctx.strokeStyle = 'rgba(0,0,0,0.15)';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  return c.toDataURL();
-}
-
-// Creates a chest drawing on canvas and returns base64 URL
-function createChestSprite(){
-  const w = 48, h = 34;
-  const c = document.createElement('canvas'); c.width = w; c.height = h;
-  const ctx = c.getContext('2d');
-  // base
-  ctx.fillStyle = '#8b4513';
-  roundRectCtx(ctx, 2, 10, w-4, h-12, 6);
-  ctx.fillStyle = '#d1a354';
-  roundRectCtx(ctx, 2, 6, w-4, 8, 6);
-  ctx.fill();
-  // lock
-  ctx.fillStyle = '#4b2e14';
-  ctx.fillRect(w/2-4, 16, 8, 10);
-  ctx.beginPath();
-  ctx.fillStyle = 'rgba(0,0,0,0.18)';
-  ctx.arc(w/2, 18, 2, 0, Math.PI*2);
-  ctx.fill();
-  return c.toDataURL();
-}
-
-function roundRectCtx(ctx,x,y,w,h,r){
-  ctx.beginPath();
-  ctx.moveTo(x+r,y);
-  ctx.arcTo(x+w,y,x+w,y+h,r);
-  ctx.arcTo(x+w,y+h,x,y+h,r);
-  ctx.arcTo(x,y+h,x,y,r);
-  ctx.arcTo(x,y,x+w,y,r);
-  ctx.closePath();
-}
-
-// -----------------------------
-// Lógica al tocar un cofre
-// -----------------------------
-let waitingForAnswer = false;
-let currentQuestion = null;
-let currentPlayer = null;
-let currentChest = null;
-
-function onChestTouched(scene, chest, playerNumber){
-  if(waitingForAnswer) return;
-  if(chest.collected) return;
-  waitingForAnswer = true;
-  currentChest = chest;
-  currentPlayer = playerNumber;
-  currentQuestion = QUESTIONS[chest.questionIndex];
-
-  // pausa física
-  scene.physics.world.pause();
-  // mostrar modal con pregunta
-  showQuestionModal(playerNumber, currentQuestion);
-}
-
-function showQuestionModal(playerNumber, questionObj){
-  qm_player.textContent = `Jugador ${playerNumber} responde`;
-  qm_question.textContent = questionObj.q;
-  qm_feedback.textContent = questionObj.topic || '';
-  qm_options.innerHTML = '';
-
-  // crear botones A B C D
-  questionObj.options.forEach((opt, i) => {
-    const btn = document.createElement('button');
-    btn.className = 'optBtn';
-    btn.innerHTML = `<strong>${String.fromCharCode(65+i)}</strong>. ${opt}`;
-    btn.onclick = () => handleAnswer(i);
-    qm_options.appendChild(btn);
-  });
-
-  modal.style.display = 'block';
-  // focus first button for keyboard accessibility
-  const firstBtn = qm_options.querySelector('button');
-  if(firstBtn) firstBtn.focus();
-}
-
-// manejar respuesta
-function handleAnswer(selectedIndex){
-  // validar
-  const correctIndex = currentQuestion.answer;
-  const isCorrect = (selectedIndex === correctIndex);
-
-  // actualizar puntaje segun jugador
-  if(currentPlayer === 1){
-    score1 += isCorrect ? 10 : -5;
-    if(score1 < 0) score1 = 0;
-  } else {
-    score2 += isCorrect ? 10 : -5;
-    if(score2 < 0) score2 = 0;
-  }
-  // marcar cofre como recogido y quitar del mapa
-  if(currentChest){
-    // play small animation: tint the chest then destroy
-    currentChest.collected = true;
-    currentChest.setTint(isCorrect ? 0x7CFC00 : 0xFF6B6B);
-    // quitar phys after unpause
-  }
-
-  // mostrar retroalimentación breve en modal
-  qm_question.textContent = isCorrect ? '¡Correcto!' : 'Respuesta incorrecta';
-  qm_options.innerHTML = `<div style="padding:10px;font-weight:800">${isCorrect ? '+10 puntos' : '-5 puntos'}</div>`;
-
-  updateScoresHUD();
-
-  // esperar 900ms y cerrar modal
-  setTimeout(()=> {
-    hideModal();
-    // eliminar cofre del grupo
-    if(currentChest){
-      currentChest.destroy();
-      currentChest = null;
-    }
-    waitingForAnswer = false;
-  }, 900);
-}
-
-function hideModal(){
-  modal.style.display = 'none';
-  // reanudar física
-  game.scene.scenes[0].physics.world.resume();
-  // check chests left
-  chestsTotal = chestsGroup.getChildren().filter(c=>!c.collected).length;
-  document.getElementById('chestsLeft').textContent = `Cofres: ${chestsTotal}`;
-  // final: si no quedan cofres -> mostrar ganador
-  if(chestsTotal === 0){
-    setTimeout(showFinalWinner, 300);
-  }
-}
-
-function updateScoresHUD(){
-  document.getElementById('score1').textContent = score1;
-  document.getElementById('score2').textContent = score2;
-  chestsTotal = chestsGroup.getChildren().filter(c=>!c.collected).length;
-  document.getElementById('chestsLeft').textContent = `Cofres: ${chestsTotal}`;
-}
-
-// -----------------------------
-// Update / Controls
-// -----------------------------
-function update(){
-  const scene = game.scene.scenes[0]; // current scene
-  if(!scene) return;
-
-  // Player 1 controls (Flechas)
-  const speed = 220;
-  if(cursors.left.isDown){
-    player1.setVelocityX(-speed);
-  } else if(cursors.right.isDown){
-    player1.setVelocityX(speed);
-  } else {
-    player1.setVelocityX(0);
-  }
-  if(cursors.up.isDown && player1.body.touching.down){
-    player1.setVelocityY(-420);
-  }
-
-  // Player 2 controls (W A D)
-  if(keysWASD.left.isDown){
-    player2.setVelocityX(-speed);
-  } else if(keysWASD.right.isDown){
-    player2.setVelocityX(speed);
-  } else {
-    player2.setVelocityX(0);
-  }
-  if(keysWASD.up.isDown && player2.body.touching.down){
-    player2.setVelocityY(-420);
-  }
-
-  // limit players inside world
-  player1.x = Phaser.Math.Clamp(player1.x, 16, config.width - 16);
-  player2.x = Phaser.Math.Clamp(player2.x, 16, config.width - 16);
-
-  // small camera follow average position
-  const midX = (player1.x + player2.x) / 2;
-  const cam = scene.cameras.main;
-  cam.centerOn(Phaser.Math.Clamp(midX, config.width/2, config.width/2), config.height/2);
-
-  // update HUD frequently
-  updateScoresHUD();
-}
-
-// Mostrar ganador final
-function showFinalWinner(){
-  const winnerText = score1 > score2 ? `¡Gana Jugador 1 (${score1} pts)!` : (score2 > score1 ? `¡Gana Jugador 2 (${score2} pts)!` : `Empate (${score1} - ${score2})`);
-  alert(`Juego terminado. ${winnerText}`);
-  // reiniciar la página para jugar de nuevo
-  window.location.reload();
-}
-
-// Prevent accidental keyboard scrolling
-window.addEventListener('keydown', (e) => {
-  if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].indexOf(e.code) > -1) {
-    e.preventDefault();
-  }
-});
-
-</script>
-
+    <footer>
+      <p class="muted">Hecho con ❤ — Prueba los tres juegos. Los sonidos usan Web Audio para no depender de ficheros externos.</p>
+    </footer>
+  </main>
+</div>
 <div style="margin-top:18px; text-align:center;">
   <button onclick="window.location.href='index.html'" class="btn-ghost">⬅ Volver al inicio</button>
 </div>
 
+
+<script>
+/* ============================
+   Sonidos — Web Audio (simple)
+   ============================ */
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function tone(freq, duration=200, type='sine', gain=0.12){
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = type;
+  o.frequency.value = freq;
+  g.gain.value = gain;
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start();
+  setTimeout(()=>{ o.stop(); }, duration);
+}
+
+/* efectos simples */
+function playSound(name){
+  // resume context on first gesture
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+
+  switch(name){
+    case 'click': tone(1000,80,'sine',0.06); break;
+    case 'error': tone(220,250,'sawtooth',0.14); setTimeout(()=>tone(160,200,'sawtooth',0.12),220); break;
+    case 'win': tone(880,150,'triangle',0.12); setTimeout(()=>tone(1100,200,'triangle',0.12),160); setTimeout(()=>tone(1320,180,'triangle',0.09),340); break;
+    case 'lose': tone(120,200,'square',0.14); setTimeout(()=>tone(90,220,'square',0.12),180); break;
+    case 'dice': tone(600,120,'sine',0.12); break;
+    case 'pop': tone(1200,90,'sine',0.08); break;
+  }
+}
+
+/* ============================
+   Manejo de vistas (menu)
+   ============================ */
+function showGame(id){
+  document.querySelectorAll('main section').forEach(s => s.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+  document.querySelectorAll('.menu button').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn-' + id).classList.add('active');
+}
+
+/* ===============
+   AHORCADO
+   =============== */
+const palabras = ["LIBRO","VIDEO","PLATAFORMA","DOCENTE","APRENDIZAJE","TECNOLOGIA","ESTUDIANTE"];
+let palabraSecreta, intentoArr, intentosRestantes, letrasUsadas;
+const maxFallos = 6;
+
+const canvas = document.getElementById('ahorcadoCanvas');
+const ctx = canvas.getContext('2d');
+
+function startAhorcado(){
+  palabraSecreta = palabras[Math.floor(Math.random()*palabras.length)];
+  intentoArr = Array.from({length: palabraSecreta.length}, ()=>'_');
+  intentosRestantes = maxFallos;
+  letrasUsadas = new Set();
+  document.getElementById('intentos').textContent = intentosRestantes;
+  document.getElementById('palabraArea').textContent = intentoArr.join(' ');
+  document.getElementById('msgAhorcado').textContent = '';
+  buildKeyboard();
+  drawBase();
+  playSound('pop');
+}
+startAhorcado();
+
+/* dibuja la estructura base */
+function drawBase(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = "#163a3a";
+
+  // ground
+  ctx.beginPath();
+  ctx.moveTo(20,300);
+  ctx.lineTo(280,300);
+  ctx.stroke();
+
+  // poste
+  ctx.beginPath();
+  ctx.moveTo(60,300);
+  ctx.lineTo(60,40);
+  ctx.lineTo(180,40);
+  ctx.lineTo(180,80);
+  ctx.stroke();
+
+  // rope placeholder
+  ctx.beginPath();
+  ctx.moveTo(180,80);
+  ctx.lineTo(180,100);
+  ctx.stroke();
+
+  // draw body parts depending on mistakes
+  const fallos = maxFallos - intentosRestantes;
+  ctx.strokeStyle = "#0b2b2e";
+  ctx.lineWidth = 3;
+
+  if(fallos>=1){ // cabeza
+    ctx.beginPath();
+    ctx.arc(180,120,22,0,Math.PI*2);
+    ctx.stroke();
+  }
+  if(fallos>=2){ // body
+    ctx.beginPath();
+    ctx.moveTo(180,142);
+    ctx.lineTo(180,220);
+    ctx.stroke();
+  }
+  if(fallos>=3){ // left arm
+    ctx.beginPath();
+    ctx.moveTo(180,160);
+    ctx.lineTo(150,190);
+    ctx.stroke();
+  }
+  if(fallos>=4){ // right arm
+    ctx.beginPath();
+    ctx.moveTo(180,160);
+    ctx.lineTo(210,190);
+    ctx.stroke();
+  }
+  if(fallos>=5){ // left leg
+    ctx.beginPath();
+    ctx.moveTo(180,220);
+    ctx.lineTo(150,260);
+    ctx.stroke();
+  }
+  if(fallos>=6){ // right leg
+    ctx.beginPath();
+    ctx.moveTo(180,220);
+    ctx.lineTo(210,260);
+    ctx.stroke();
+
+    // eyes X
+    ctx.strokeStyle = "#b91c1c";
+    ctx.beginPath();
+    ctx.moveTo(172,112); ctx.lineTo(176,118);
+    ctx.moveTo(176,112); ctx.lineTo(172,118);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(186,112); ctx.lineTo(190,118);
+    ctx.moveTo(190,112); ctx.lineTo(186,118);
+    ctx.stroke();
+  }
+}
+
+/* teclado interactivo */
+function buildKeyboard(){
+  const keyboard = document.getElementById('keyboard');
+  keyboard.innerHTML='';
+  const letters = "ABCDEFGHIJKLMNÑOPQRSTUVWXYZ".split('');
+  letters.forEach(l=>{
+    const btn = document.createElement('div');
+    btn.className='key';
+    btn.textContent=l;
+    btn.onclick=()=> tryLetter(l,btn);
+    if(letrasUsadas.has(l)) btn.classList.add('disabled');
+    keyboard.appendChild(btn);
+  });
+}
+
+function tryLetter(letter, btn){
+  if(intentosRestantes<=0) return;
+  if(letrasUsadas.has(letter)) return;
+  letrasUsadas.add(letter);
+  if(btn) btn.classList.add('disabled');
+
+  if(palabraSecreta.includes(letter)){
+    for(let i=0;i<palabraSecreta.length;i++){
+      if(palabraSecreta[i]===letter) intentoArr[i]=letter;
+    }
+    document.getElementById('palabraArea').textContent = intentoArr.join(' ');
+    playSound('pop');
+    // win?
+    if(intentoArr.join('')===palabraSecreta){
+      document.getElementById('msgAhorcado').textContent = '🎉 ¡Ganaste! La palabra es ' + palabraSecreta;
+      playSound('win');
+    }
+  } else {
+    intentosRestantes--;
+    document.getElementById('intentos').textContent = intentosRestantes;
+    playSound('error');
+    drawBase();
+    if(intentosRestantes===0){
+      document.getElementById('msgAhorcado').textContent = '❌ Fin del juego. La palabra era ' + palabraSecreta;
+      playSound('lose');
+    }
+  }
+}
+
+/* permitir ingresar desde teclado físico */
+document.addEventListener('keydown', e=>{
+  if(document.getElementById('ahorcado').classList.contains('hidden')) return;
+  const k = e.key.toUpperCase();
+  if(/^[A-ZÑ]$/.test(k)) {
+    const keys = [...document.querySelectorAll('#keyboard .key')];
+    const btn = keys.find(x=>x.textContent===k);
+    tryLetter(k, btn);
+  }
+});
+
+/* pista (revela una letra) */
+function hintLetter(){
+  if(intentosRestantes<=1) return;
+  // reveal random unrevealed letter
+  const hiddenIdx = [];
+  for(let i=0;i<intentoArr.length;i++) if(intentoArr[i]==='_') hiddenIdx.push(i);
+  if(hiddenIdx.length===0) return;
+  const idx = hiddenIdx[Math.floor(Math.random()*hiddenIdx.length)];
+  const letter = palabraSecreta[idx];
+  // simulate clicking that letter
+  const keys = [...document.querySelectorAll('#keyboard .key')];
+  const btn = keys.find(x=>x.textContent===letter);
+  intentosRestantes--;
+  document.getElementById('intentos').textContent = intentosRestantes;
+  tryLetter(letter, btn);
+}
+
+/* ===============
+   CRUCIGRAMA
+   =============== */
+/* diseño del crucigrama (10x9) - representa filas y columnas; ' ' es celda blanca con input; '#' celda negra */
+const cwLayout = [
+  ['L','I','B','R','O','#','V','I','D','E','O'],
+  ['#','#','A','#','#','#','E','#','#','#','#'],
+  ['T','E','C','N','O','L','O','G','I','A','#'],
+  ['#','#','C','#','A','#','N','#','#','#','#'],
+  ['P','L','A','T','A','F','O','R','M','A','#'],
+  ['#','#','#','#','#','#','#','#','#','#','#'],
+  ['E','S','T','U','D','I','A','N','T','E','#']
+];
+
+/* Convertimos layout en grid y mapeamos palabras esperadas. */
+const cwRows = cwLayout.length;
+const cwCols = cwLayout[0].length;
+
+const cwGridEl = document.getElementById('cwGrid');
+cwGridEl.style.gridTemplateColumns = `repeat(${cwCols}, auto)`;
+cwGridEl.style.gridAutoRows = 'auto';
+
+let cwCells = []; // guardará referencias
+
+function buildCrossword(){
+  cwGridEl.innerHTML='';
+  cwCells = [];
+  for(let r=0;r<cwRows;r++){
+    for(let c=0;c<cwCols;c++){
+      const val = cwLayout[r][c];
+      const cell = document.createElement('div');
+      cell.className = 'cw-cell';
+      if(val === '#'){
+        cell.classList.add('black');
+        cell.innerHTML='';
+      } else {
+        const input = document.createElement('input');
+        input.maxLength = 1;
+        input.dataset.r = r; input.dataset.c = c;
+        input.addEventListener('input', (e) => {
+          e.target.value = e.target.value.toUpperCase();
+          // auto focus next cell
+          moveFocus(r,c,'next');
+        });
+        input.addEventListener('keydown',(e)=>{
+          if(e.key === 'Backspace' && !e.target.value){
+            moveFocus(r,c,'prev');
+          }
+        });
+        cell.appendChild(input);
+      }
+      cwGridEl.appendChild(cell);
+      cwCells.push({r,c,el:cell});
+    }
+  }
+}
+buildCrossword();
+
+/* mueve foco al siguiente input no-negro en la fila */
+function moveFocus(r,c,dir){
+  let idx;
+  for(let i=0;i<cwCells.length;i++){
+    if(cwCells[i].r===r && cwCells[i].c===c){ idx=i; break; }
+  }
+  if(idx===undefined) return;
+  if(dir==='next'){
+    for(let j=idx+1;j<cwCells.length;j++){
+      if(!cwCells[j].el.classList.contains('black')){
+        const inp = cwCells[j].el.querySelector('input');
+        if(inp){ inp.focus(); break; }
+      }
+    }
+  } else if(dir==='prev'){
+    for(let j=idx-1;j>=0;j--){
+      if(!cwCells[j].el.classList.contains('black')){
+        const inp = cwCells[j].el.querySelector('input');
+        if(inp){ inp.focus(); break; }
+      }
+    }
+  }
+}
+
+/* comprobar crucigrama completo */
+function checkCrossword(){
+  // reconstruir respuesta y comparar con layout
+  let correct=0, total=0;
+  cwCells.forEach(cell=>{
+    if(cell.el.classList.contains('black')) return;
+    const input = cell.el.querySelector('input');
+    total++;
+    const expected = cwLayout[cell.r][cell.c];
+    const val = (input.value || '').toUpperCase();
+    if(val===expected){
+      cell.el.style.background = '#ecfdf5'; // light green
+      input.style.color = 'var(--success)';
+      correct++;
+    } else {
+      cell.el.style.background = '#fff1f2'; // light red
+      input.style.color = 'var(--danger)';
+    }
+  });
+  playSound(correct===total ? 'win' : 'pop');
+  const msg = correct===total ? `🎉 ¡Perfecto! Todas las letras están bien (${correct}/${total}).` : `✅ Letras correctas: ${correct} de ${total}. Corrige las rojas.`;
+  alert(msg);
+}
+
+/* reiniciar crucigrama */
+function resetCrossword(){
+  cwCells.forEach(cell=>{
+    if(cell.el.classList.contains('black')) return;
+    const input = cell.el.querySelector('input');
+    input.value='';
+    cell.el.style.background='';
+    input.style.color='';
+  });
+  playSound('click');
+}
+
+/* =========================
+   DADO CON PREGUNTAS
+   ========================= */
+const diceBox = document.getElementById('diceBox');
+const diceQuestion = document.getElementById('diceQuestion');
+const diceAnswer = document.getElementById('diceAnswer');
+
+const diceQA = [
+  {q:'¿Qué recurso impreso se usa para estudiar?', a:'LIBRO 📖'},
+  {q:'¿Qué recurso audiovisual ayuda a enseñar con imágenes y sonido?', a:'VIDEO 🎥'},
+  {q:'¿Cómo se llama la plataforma virtual para clases?', a:'PLATAFORMA 💻'},
+  {q:'¿Quién guía el aprendizaje en el aula?', a:'DOCENTE 👩‍🏫'},
+  {q:'¿Persona que aprende?', a:'ESTUDIANTE 👨‍🎓'},
+  {q:'Elemento que impulsa la educación moderna?', a:'TECNOLOGÍA ⚙️'}
+];
+
+let diceAnimating = false;
+function playDice(){
+  if(diceAnimating) return;
+  diceAnimating = true;
+  playSound('dice');
+  diceBox.classList.add('spin');
+  // fake animation then set number
+  setTimeout(()=>{
+    const n = Math.floor(Math.random()*6)+1;
+    diceBox.textContent = n;
+    const qa = diceQA[n-1];
+    diceQuestion.textContent = qa.q;
+    diceAnswer.textContent = qa.a;
+    diceBox.classList.remove('spin');
+    diceAnimating = false;
+    playSound('pop');
+  }, 700);
+}
+
+/* iniciar / estado por defecto */
+showGame('ahorcado');
+buildKeyboard();
+drawBase();
+
+/* Exponer algunas funciones para botones */
+window.startAhorcado = startAhorcado;
+window.hintLetter = hintLetter;
+window.resetCrossword = resetCrossword;
+window.checkCrossword = checkCrossword;
+window.playDice = playDice;
+window.playSound = playSound;
+</script>
 </body>
 </html>
-
-
-
